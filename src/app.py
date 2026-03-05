@@ -1,5 +1,7 @@
 import streamlit as st
 import os
+import json
+from datetime import datetime
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -17,6 +19,17 @@ st.title("🏥 ASD Knowledge Base")
 def load_vector_db():
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     return Chroma(persist_directory="./asd_vector_db", embedding_function=embeddings)
+
+def log_rag_interaction(query, answer, docs):
+    log_entry = {
+        "timestamp": str(datetime.now()),
+        "query": query,
+        "answer": answer,
+        "retrieved_context": [doc.page_content for doc in docs]
+    }
+
+    with open("data/rag_logs.jsonl", "a") as f:
+        f.write(json.dumps(log_entry) + "\n")
 
 db = load_vector_db()
 retriever = db.as_retriever(search_kwargs={"k": 5})
@@ -42,7 +55,17 @@ if query := st.chat_input():
     st.session_state.messages.append({"role": "user", "content": query})
     st.chat_message("user").write(query)
     
-    response = chain.invoke(query)
+    # response = chain.invoke(query)
+    docs = retriever.invoke(query)
+    context = "\n".join([doc.page_content for doc in docs])
+
+    response = llm.invoke(
+        prompt.format(context=context, question=query)
+    )
+
+    answer = response.content
+
+    log_rag_interaction(query, answer, docs)
     
     st.session_state.messages.append({"role": "assistant", "content": response.content})
     st.chat_message("assistant").write(response.content)
