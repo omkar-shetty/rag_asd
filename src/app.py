@@ -17,19 +17,26 @@ st.title("🏥 ASD Knowledge Base")
 # --- INITIALIZE DATABASE (Cached) ---
 @st.cache_resource
 def load_vector_db():
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    return Chroma(persist_directory="./asd_vector_db", embedding_function=embeddings)
+    try:
+        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        return Chroma(persist_directory="./asd_vector_db", embedding_function=embeddings)
+    except Exception as e:
+        st.error(f"Failed to load vector database: {str(e)}")
+        raise
 
 def log_rag_interaction(query, answer, docs):
-    log_entry = {
-        "timestamp": str(datetime.now()),
-        "query": query,
-        "answer": answer,
-        "retrieved_context": [doc.page_content for doc in docs]
-    }
+    try:
+        log_entry = {
+            "timestamp": str(datetime.now()),
+            "query": query,
+            "answer": answer,
+            "retrieved_context": [doc.page_content for doc in docs]
+        }
 
-    with open("data/rag_logs.jsonl", "a") as f:
-        f.write(json.dumps(log_entry) + "\n")
+        with open("data/rag_logs.jsonl", "a") as f:
+            f.write(json.dumps(log_entry) + "\n")
+    except Exception as e:
+        st.warning(f"Failed to log interaction: {str(e)}")
 
 db = load_vector_db()
 retriever = db.as_retriever(search_kwargs={"k": 5})
@@ -55,17 +62,21 @@ if query := st.chat_input():
     st.session_state.messages.append({"role": "user", "content": query})
     st.chat_message("user").write(query)
     
-    # response = chain.invoke(query)
-    docs = retriever.invoke(query)
-    context = "\n".join([doc.page_content for doc in docs])
+    try:
+        # response = chain.invoke(query)
+        docs = retriever.invoke(query)
+        context = "\n".join([doc.page_content for doc in docs])
 
-    response = llm.invoke(
-        prompt.format(context=context, question=query)
-    )
+        response = llm.invoke(
+            prompt.format(context=context, question=query)
+        )
 
-    answer = response.content
+        answer = response.content
 
-    log_rag_interaction(query, answer, docs)
-    
-    st.session_state.messages.append({"role": "assistant", "content": response.content})
-    st.chat_message("assistant").write(response.content)
+        log_rag_interaction(query, answer, docs)
+        
+        st.session_state.messages.append({"role": "assistant", "content": response.content})
+        st.chat_message("assistant").write(response.content)
+    except Exception as e:
+        st.error(f"Error processing query: {str(e)}")
+        st.session_state.messages.pop()  # Remove the user message if processing failed

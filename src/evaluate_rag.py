@@ -31,29 +31,45 @@ class GroqJudge(DeepEvalBaseLLM):
     def get_model_name(self):
         return self.model_name
 
-metric = FaithfulnessMetric(
-    threshold=0.7,
-    model=GroqJudge(),
-    include_reason=True
-)
+try:
+    metric = FaithfulnessMetric(
+        threshold=0.7,
+        model=GroqJudge(),
+        include_reason=True
+    )
 
-test_cases = []
+    test_cases = []
 
-with open("data/rag_logs.jsonl") as f:
-    for line in f:
-        entry = json.loads(line)
+    try:
+        with open("data/rag_logs.jsonl") as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        entry = json.loads(line)
+                        test_case = LLMTestCase(
+                            input=entry["query"],
+                            actual_output=entry["answer"],
+                            retrieval_context=entry["retrieved_context"]
+                        )
+                        test_cases.append(test_case)
+                    except json.JSONDecodeError as e:
+                        print(f"Warning: Skipping malformed JSON line: {str(e)}")
+                        continue
+    except FileNotFoundError:
+        print("Error: rag_logs.jsonl not found. Please run the app first to generate logs.")
+        exit(1)
 
-        test_case = LLMTestCase(
-            input=entry["query"],
-            actual_output=entry["answer"],
-            retrieval_context=entry["retrieved_context"]
-        )
+    if not test_cases:
+        print("Error: No valid test cases found in rag_logs.jsonl")
+        exit(1)
 
-        test_cases.append(test_case)
+    print(f"Evaluating {len(test_cases)} test cases...")
+    results = evaluate(
+        test_cases=test_cases,
+        metrics=[metric]
+    )
 
-results = evaluate(
-    test_cases=test_cases,
-    metrics=[metric]
-)
-
-print(results)
+    print(results)
+except Exception as e:
+    print(f"Error during evaluation: {str(e)}")
+    exit(1)
