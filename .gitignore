@@ -1,1 +1,12 @@
 .env
+.streamlit/secrets.toml
+venv/
+__pycache__/
+*.pyc
+logs/
+corpus/
+asd_vector_db/
+vector_db_standard/
+vector_db_semantic/
+data/rag_logs.jsonl
+temp_eval_*/
