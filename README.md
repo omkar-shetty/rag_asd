@@ -93,20 +93,21 @@ streamlit run src/app.py
 
 ```
 rag_asd/
-├── corpus/                          # Input PDFs for indexing
+├── corpus/                          # Input PDFs for indexing (excluded from repo)
 ├── src/
 │   ├── build_db.py                  # Index corpus with chosen chunking strategy
 │   ├── compare_chunking.py          # Benchmark chunking strategies
 │   ├── compare_hallucinations.py    # RAG vs LLM hallucination comparison
+│   ├── logger_config.py             # Shared logging setup
 │   └── app.py                       # Streamlit UI
-├── vector_db_standard/              # Vector store (standard chunking)
-├── vector_db_parent-child/          # Vector store (parent-child chunking)
-├── vector_db_semantic/              # Vector store (semantic chunking)
-├── parent_store/                    # Parent documents for parent-child strategy
+├── vector_db_parent-child/          # Pre-built vector store (committed to repo)
+├── parent_store/                    # Pre-built parent documents (committed to repo)
 ├── data/
 │   └── rag_logs.jsonl              # Query logs from the UI
 ├── logs/                            # Script logs
-├── .env                             # API keys
+├── .streamlit/
+│   └── secrets.toml.example        # API key template for local setup
+├── .env                             # API keys (local only, gitignored)
 ├── requirements.txt
 └── README.md
 ```
@@ -134,7 +135,7 @@ Keys are automatically loaded via `python-dotenv` when scripts run.
 
 ## Chunking Strategy Comparison
 
-Benchmarked on the ASD corpus (348 documents):
+Benchmarked on the ASD corpus (348 documents) across 3 domain-specific queries:
 
 | Strategy     | Chunks | Avg Size  | Chunking Time | Retrieval Latency | Faithfulness (max / mean) |
 | :----------- | -----: | --------: | ------------: | ----------------: | ------------------------: |
