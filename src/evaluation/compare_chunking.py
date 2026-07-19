@@ -4,7 +4,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_huggingface import HuggingFaceEmbeddings
 from dotenv import load_dotenv
-from logger_config import setup_script_logger
+from ..logger_config import setup_script_logger
 import numpy as np
 import statistics
 import time
@@ -117,8 +117,7 @@ def benchmark_retrieval_latency(chunks,
     }
 
 def score_faithfulness(chunks, eval_set: list = EVAL_SET, k: int = 5, embeddings=None, vectorstore=None) -> dict:
-    """Measures cosine similarity between reference answers and retrieved chunks.
-    """
+    """Measures cosine similarity between reference answers and retrieved chunks."""
     if not embeddings:
         embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 

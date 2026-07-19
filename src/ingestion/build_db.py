@@ -1,16 +1,18 @@
-from langchain_community.document_loaders import PyPDFDirectoryLoader
-from langchain_classic.retrievers import ParentDocumentRetriever
-from langchain_classic.storage import InMemoryStore, LocalFileStore
-from langchain_classic.storage._lc_store import create_kv_docstore
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_experimental.text_splitter import SemanticChunker
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from logger_config import setup_script_logger
+import argparse
 import os
 import shutil
 import sys
-import argparse
+
+from langchain_community.document_loaders import PyPDFDirectoryLoader
+from langchain_community.vectorstores import Chroma
+from langchain_classic.retrievers import ParentDocumentRetriever
+from langchain_classic.storage import LocalFileStore
+from langchain_classic.storage._lc_store import create_kv_docstore
+from langchain_experimental.text_splitter import SemanticChunker
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from ..logger_config import setup_script_logger
 
 logger = setup_script_logger("build_db")
 
@@ -18,14 +20,14 @@ logger = setup_script_logger("build_db")
 def build_vector_store_recursive(docs, persist_directory):
     """Build vector database using vanilla RecursiveCharacterTextSplitter"""
     if os.path.exists(persist_directory):
-            logger.info(f"Cleaning existing directory: {persist_directory}")
-            shutil.rmtree(persist_directory)
+        logger.info(f"Cleaning existing directory: {persist_directory}")
+        shutil.rmtree(persist_directory)
 
     logger.info("Building database with standard RecursiveCharacterTextSplitter...")
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = splitter.split_documents(docs)
     logger.info(f"Created {len(chunks)} chunks.")
-    
+
     logger.info("Generating embeddings and building vector database...")
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     vectorstore = Chroma.from_documents(
@@ -41,28 +43,29 @@ def build_vector_store_recursive(docs, persist_directory):
 def build_database_parent_child(docs, persist_directory):
     """Build retriever using Parent-Child splitter strategy"""
     if os.path.exists(persist_directory):
-            logger.info(f"Cleaning existing directory: {persist_directory}")
-            shutil.rmtree(persist_directory)
+        logger.info(f"Cleaning existing directory: {persist_directory}")
+        shutil.rmtree(persist_directory)
+
     logger.info("Building retriever with Parent-Child splitter strategy...")
     parent_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     child_splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=20)
-    
+
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     vectorstore = Chroma(
-        collection_name="asd_corpus", 
+        collection_name="asd_corpus",
         embedding_function=embeddings,
         persist_directory=persist_directory
     )
     fs = LocalFileStore("./parent_store")
     store = create_kv_docstore(fs)
-    
+
     retriever = ParentDocumentRetriever(
         vectorstore=vectorstore,
         docstore=store,
         child_splitter=child_splitter,
         parent_splitter=parent_splitter,
     )
-    
+
     retriever.add_documents(docs, ids=None)
     logger.info(f"Successfully added {len(docs)} documents to retriever.")
     return retriever
@@ -71,21 +74,19 @@ def build_database_parent_child(docs, persist_directory):
 def build_vector_store_semantic(docs, persist_directory):
     """Build vector database using semantic chunking based on embeddings"""
     if os.path.exists(persist_directory):
-            logger.info(f"Cleaning existing directory: {persist_directory}")
-            shutil.rmtree(persist_directory)
+        logger.info(f"Cleaning existing directory: {persist_directory}")
+        shutil.rmtree(persist_directory)
 
     logger.info("Building database with SemanticChunker...")
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    
-    # Initialize semantic chunker with embeddings
     splitter = SemanticChunker(
         embeddings=embeddings,
         breakpoint_threshold_type="percentile"
     )
-    
+
     chunks = splitter.split_documents(docs)
     logger.info(f"Created {len(chunks)} chunks using semantic splitting.")
-    
+
     logger.info("Generating embeddings and building vector database...")
     vectorstore = Chroma.from_documents(
         collection_name="asd_corpus",
@@ -107,15 +108,13 @@ def main():
         help="Splitter strategy to use (default: standard)"
     )
     args = parser.parse_args()
-    
+
     try:
-        # Load everything in the folder
         logger.info("Loading PDFs from corpus...")
         loader = PyPDFDirectoryLoader("corpus/")
         docs = loader.load()
         logger.info(f"Loaded {len(docs)} documents.")
 
-        # Split based on selected strategy
         logger.info(f"Splitting documents using {args.splitter} strategy...")
         path = f"./vector_db_{args.splitter}"
         if args.splitter == "standard":
@@ -124,9 +123,9 @@ def main():
             build_database_parent_child(docs, path)
         elif args.splitter == "semantic":
             build_vector_store_semantic(docs, path)
-        
+
         logger.info("Database build completed successfully.")
-            
+
     except FileNotFoundError as e:
         logger.error(f"Corpus directory or files not found: {str(e)}")
         sys.exit(1)
