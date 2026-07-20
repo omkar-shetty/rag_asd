@@ -67,7 +67,7 @@ def main():
 
     test_cases = []
     try:
-        with open("data/rag_logs.jsonl") as f:
+        with open("data/rag_logs_eval.jsonl") as f:
             for line in f:
                 if not line.strip():
                     continue
