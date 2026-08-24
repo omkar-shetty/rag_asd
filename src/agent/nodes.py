@@ -72,3 +72,20 @@ def direct_answer_node(state: AgentState) -> dict:
     response = llm.invoke(rendered)
 
     return {"answer":response.content, "source":"direct"}
+
+def refuse_node(state: AgentState) -> dict:
+    """Generate a refusal to answer the question."""
+
+    return {
+        "answer": "I can only help with questions about Autism Spectrum Disorder (ASD). \
+        Could you rephrase your question to focus on that?",
+        "source": "refused",
+    }
+
+def web_search_node(state: AgentState) -> dict:
+    """Generate a reply based on a web search. (Not yet implemented.)"""
+    
+    return {
+        "answer": "[web search not yet implemented]",
+        "source": "web",
+    }
