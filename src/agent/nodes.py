@@ -3,6 +3,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from src.agent.state import AgentState
 from src.agent.retriever import build_retriever
 from src.agent.llm import llm
+from src.constants import Constants
+from src.agent.web_search import tavily_client
 
 retriever = build_retriever()
 
@@ -84,8 +86,22 @@ def refuse_node(state: AgentState) -> dict:
 
 def web_search_node(state: AgentState) -> dict:
     """Generate a reply based on a web search. (Not yet implemented.)"""
-    
+
+    results = tavily_client.search(query = state["question"], 
+                                   include_domains=Constants.CURATED_DOMAINS,
+                                   max_results=5)
+    context = " ".join(r["content"] for r in results.get("results", []))
+    context = context if context else "No results found."
+
+    prompt = ChatPromptTemplate.from_template(
+        "Context from recent web search: {context}\n\nQuestion: {question}\n\n"
+        "Answer concisely based on the search results. "
+        "If the results do not contain relevant information, say so."
+    )
+    rendered = prompt.format(context=context, question=state["question"])
+    response = llm.invoke(rendered)
+
     return {
-        "answer": "[web search not yet implemented]",
+        "answer": response.content,
         "source": "web",
     }
