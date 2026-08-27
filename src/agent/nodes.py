@@ -85,7 +85,7 @@ def refuse_node(state: AgentState) -> dict:
     }
 
 def web_search_node(state: AgentState) -> dict:
-    """Generate a reply based on a web search. (Not yet implemented.)"""
+    """Generate a reply based on a web search."""
 
     results = tavily_client.search(query = state["question"], 
                                    include_domains=Constants.CURATED_DOMAINS,
@@ -101,7 +101,10 @@ def web_search_node(state: AgentState) -> dict:
     rendered = prompt.format(context=context, question=state["question"])
     response = llm.invoke(rendered)
 
+    urls = [r["url"] for r in results.get("results", [])]
+
     return {
         "answer": response.content,
         "source": "web",
+        "web_results": urls
     }

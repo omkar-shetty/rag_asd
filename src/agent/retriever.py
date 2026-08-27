@@ -6,6 +6,8 @@ from langchain_classic.storage import LocalFileStore
 from langchain_classic.storage._lc_store import create_kv_docstore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+load_dotenv()
+
 def build_retriever():
     """Builds a ParentDocumentRetriever against the persisted corpus."""
 
