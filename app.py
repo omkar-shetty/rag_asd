@@ -12,6 +12,11 @@ load_dotenv()
 st.set_page_config(page_title="ASD Corpus Assistant")
 st.title("ASD Knowledge Base")
 
+missing_keys = [k for k in ("GROQ_API_KEY", "TAVILY_API_KEY") if not os.getenv(k)]
+if missing_keys:
+    st.error(f"Missing required environment variable(s): {', '.join(missing_keys)}. Add them to .env (local) or Streamlit secrets (cloud).")
+    st.stop()
+
 SOURCE_LABELS = {
     "corpus": "Answered from the ASD corpus",
     "web": "Answered from a curated web search",
