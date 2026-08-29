@@ -79,8 +79,7 @@ def refuse_node(state: AgentState) -> dict:
     """Generate a refusal to answer the question."""
 
     return {
-        "answer": "I can only help with questions about Autism Spectrum Disorder (ASD). \
-        Could you rephrase your question to focus on that?",
+        "answer": "I can only help with questions about Autism Spectrum Disorder (ASD). Could you rephrase your question to focus on that?",
         "source": "refused",
     }
 
