@@ -1,6 +1,7 @@
 # ASD RAG
 
-A RAG (Retrieval Augmented Generation) system for ASD (Autism Spectrum Disorder) clinical and caregiver literature, built to answer only from source material. Three chunking strategies and three faithfulness evaluation methods are benchmarked. Built on LangChain, ChromaDB, and Llama 3.1 via Groq with a Streamlit UI.
+A retrieval and reasoning system for ASD (Autism Spectrum Disorder) clinical and caregiver literature. This project initially started as a RAG based implementation, with focus on evaluating chunking strategies and faithfulness, however this has now evolved into an agentic system: a LangGraph agent that always checks the curated corpus first, and for instances where the RAG response may be insufficient, falls back to a domain-restricted web search or the model's own knowledge depending on what the question needs. Built on LangChain, LangGraph, ChromaDB, and Groq-hosted LLMs, with a Streamlit UI that shows which path answered each question.
+
 
 ```mermaid
 flowchart TB
@@ -11,7 +12,7 @@ flowchart TB
  
     subgraph serving [Serving]
         direction LR
-        app["app.py<br/>Streamlit chat UI"] --> llm["Llama 3.1 (Groq)<br/>temperature = 0"] --> logs["rag_logs.jsonl<br/>logs queries & answers"]
+        app["app.py<br/>Streamlit chat UI"] --> agentGraph["LangGraph agent<br/>(routing diagram below)"] --> logs["rag_logs.jsonl<br/>logs queries, answers, source path"]
     end
  
     subgraph evaluation [Evaluation]
@@ -29,9 +30,14 @@ flowchart TB
 
 ## 1. Purpose
 
-Decisions around chunking strategy, embedding model, and prompt design shape how a RAG system behaves, but their effects are rarely verified. This project benchmarks and compares these decisions: 
-* Three chunking strategies are compared on retrieval quality and latency
-* Three separate evaluation methods (retrieval-level cosine similarity, generation-level grounding comparison, and LLM-judged faithfulness) are used to understand what "the answer is faithful to the source" actually means at different levels of the pipeline.
+Decisions around chunking strategy, embedding model, and prompt design shape how a RAG system behaves, but their effects are rarely verified. This project addresses that on two fronts:
+
+* Retrieval-quality benchmarking: Three chunking strategies compared on retrieval quality and latency, and three separate evaluation methods (retrieval-level cosine similarity, generation-level grounding comparison, LLM-judged faithfulness) to pin down what "faithful to the source" actually means at different points in the pipeline.
+* Agentic query routing: Instead of a single fixed pass, the system always retrieves from the corpus first, then uses an LLM as judge quality gate to decide which of the following scenarios is the most applicable: 
+    * the retrieved context is enough
+    * the question needs current information the corpus wouldn't have
+    * the question needs some general knowledge beyond the context of the corpus
+    * or whether the question lies outside ASD entirely and should be declined
 
 
 ## 2. How it works
@@ -43,7 +49,28 @@ Decisions around chunking strategy, embedding model, and prompt design shape how
 * **Vectorization:** `HuggingFaceEmbeddings` using the `all-MiniLM-L6-v2` transformer (384-dimensional).
 * **Storage:** Local persistence via **ChromaDB**.
 
-**Retrieval and generation:** `app.py` loads the parent-child vector store (the strategy the chunking benchmark below identifies as strongest) and serves a Streamlit chat UI. Retrieval uses `ParentDocumentRetriever`; generation uses `llama-3.1-8b-instant` via Groq at `temperature=0`, prompted to answer only from retrieved context and to say so explicitly when it cannot.
+**Retrieval, routing, and generation:** `app.py` serves a Streamlit chat UI backed by a LangGraph agent. Every question goes through the same graph:
+```mermaid
+flowchart TB
+    start(["question"]) --> search["corpus_search_node<br/>always runs first"]
+    search --> gate{"quality_gate<br/>one LLM call, one of four labels"}
+    gate -->|OUT_OF_SCOPE| refuse["refuse_node<br/>fixed refusal, no LLM call"]
+    gate -->|SUFFICIENT| corpus_ans["answer_from_corpus_node<br/>answers from retrieved chunks"]
+    gate -->|NEEDS_WEB| web["web_search_node<br/>Tavily, domain-restricted"]
+    gate -->|NEEDS_DIRECT| direct["direct_answer_node<br/>model's own knowledge"]
+    refuse --> fin(["END"])
+    corpus_ans --> fin
+    web --> fin
+    direct --> fin
+```
+
+Some design decisions behind this flow:
+* The corpus search always runs first, rather than classifying scope before retrieving. This could possibly have caused a conflation between questions that are in scope but have a limited context in the corpus vs. clearly out of scope questions. Multiple tests have shown that this is infact not an issue for this system, but this still remains a point worth calling out.
+* The `quality_gate` node just does one job - picks one of four labels: `OUT_OF_SCOPE`, `SUFFICIENT`, `NEEDS_WEB`, or `NEEDS_DIRECT`
+* Domain Restricted `web_search_node`: Tavily is called directly with `include_domains` set to a curated list of government and major clinical/advocacy institutions to ensure response quality.
+* Deterministic orchestration, non-deterministic decisions: The graph's structure i.e., which node runs next, how state moves along etc., is deterministic. `quality_gate`'s classification and each terminal node's answer are the model's own judgment, not something enforced in the code. Some nodes also carry their own scope-refusal instruction as a second, independent line of defense in case `quality_gate` misroutes.
+* Terminal nodes generate, `quality_gate` only decides: `answer_from_corpus_node`, `web_search_node`, `direct_answer_node`, and `refuse_node` each produce their own final answer using a prompt tailored to their own context source. `quality_gate` never writes user-facing text - keeps the decision and the answer separate, keeps the trace readable.
+
 
 **Evaluation:** Three evaluation methods are implemented to test different features of the pipeline.
 
@@ -60,7 +87,8 @@ The LLM judged faithfulness is the most rigorous test here. It decomposes the re
  
 * Three chunking strategies (standard, parent-child, semantic), independently benchmarked.
 * Persisted ChromaDB vector stores per strategy, built via a CLI (`build_db.py --splitter <strategy>`).
-* Streamlit chat UI.
+* Agentic query routing via a LangGraph StateGraph: corpus-first retrieval, LLM-judged four-way routing, domain-restricted web search fallback, general-knowledge fallback, and scoped refusal.
+* Streamlit chat UI with source information.
 * Three independent evaluation methods, each targeting a different part of the pipeline.
 * LLM-as-judge faithfulness evaluation with structured JSON logging and console summary stats (pass rate, verdict distribution).
 * Consistent logging (`logger_config.py`) across all scripts.
@@ -70,9 +98,17 @@ The LLM judged faithfulness is the most rigorous test here. It decomposes the re
  
 ```
 rag_asd/
+├── app.py                              # Streamlit chat UI
 ├── src/
-│   ├── app.py                          # Streamlit chat UI
 │   ├── logger_config.py                # common logging setup
+│   ├── constants.py                    # shared config: LLM model/temp, curated web domains  
+│   ├── agent/
+│   │   ├── state.py                    # AgentState - shared state passed between graph nodes
+│   │   ├── nodes.py                    # all six node functions
+│   │   ├── graph.py                    # StateGraph construction and compilation
+│   │   ├── retriever.py                # shared ParentDocumentRetriever builder
+│   │   ├── llm.py                      # shared ChatGroq instance
+│   │   └── web_search.py               # shared Tavily client  
 │   ├── ingestion/
 │   │   └── build_db.py                 # corpus loading + chunking + vector store build
 │   └── evaluation/
@@ -97,8 +133,13 @@ rag_asd/
 pip install -r requirements.txt
 ```
  
-Add a `.env` file with `GROQ_API_KEY=your_key_here`.
- 
+Add a `.env` file with 
+
+```bash
+GROQ_API_KEY=your_groq_key_here
+TAVILY_API_KEY=your_tavily_key_here
+```
+
 **Build the vector store.** 
 
 Place your PDFs in the `corpus/` directory and choose a chunking strategy. Currently, the app depends on the parent-child store specifically:
@@ -119,7 +160,7 @@ python -m src.ingestion.build_db --splitter semantic
 **Launch the app:**
  
 ```bash
-streamlit run src/app.py
+streamlit run app.py
 ```
  
 **Reproduce the chunking benchmark** (builds and compares all three strategies from scratch):
@@ -180,6 +221,9 @@ Create or update `.env` file with your API keys:
 ```bash
 # Required for Groq LLM inference
 GROQ_API_KEY=your_groq_key_here
+
+# Required for the agent's web search fallback
+TAVILY_API_KEY=your_tavily_key_here
 
 # Optional: For LLM-based faithfulness evaluation
 OPENAI_API_KEY=your_openai_key_here
