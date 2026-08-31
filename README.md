@@ -71,6 +71,15 @@ Some design decisions behind this flow:
 * Deterministic orchestration, non-deterministic decisions: The graph's structure i.e., which node runs next, how state moves along etc., is deterministic. `quality_gate`'s classification and each terminal node's answer are the model's own judgment, not something enforced in the code. Some nodes also carry their own scope-refusal instruction as a second, independent line of defense in case `quality_gate` misroutes.
 * Terminal nodes generate, `quality_gate` only decides: `answer_from_corpus_node`, `web_search_node`, `direct_answer_node`, and `refuse_node` each produce their own final answer using a prompt tailored to their own context source. `quality_gate` never writes user-facing text - keeps the decision and the answer separate, keeps the trace readable.
 
+**Corpus-sourced answer, with retrieved sources expanded:**
+![Corpus-sourced answer](screenshots/corpus_answer.png)
+
+**Web-sourced answer, domain-restricted search results shown:**
+![Web-sourced answer](screenshots/web_answer.png)
+
+**Refusal on an out-of-scope question:**
+![Refusal on out-of-scope question](screenshots/refusal.png)
+
 
 **Evaluation:** Three evaluation methods are implemented to test different features of the pipeline.
 
