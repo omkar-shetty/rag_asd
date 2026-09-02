@@ -16,7 +16,7 @@ logger = setup_script_logger("evaluate_rag")
 
 class GroqJudge(DeepEvalBaseLLM):
 
-    def __init__(self, model="llama-3.3-70b-versatile"):
+    def __init__(self, model="openai/gpt-oss-120b"):
         self.model_name = model
         self.client = None
         self.load_model()
