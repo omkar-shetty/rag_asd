@@ -87,7 +87,7 @@ Some design decisions behind this flow:
 |---|---|---|
 | Chunk-retrieval similarity | `compare_chunking.py` | Cosine similarity between a hand-written reference answer and the *retrieved chunks*. Used for evaluating the best chunking strategy for this application. |
 | Grounding comparison | `compare_hallucinations.py` | Cosine similarity between the *generated answer* and a reference, comparing the full RAG pipeline against a bare LLM with no retrieval |
-| LLM-judged faithfulness | `evaluate_rag.py` | DeepEval's `FaithfulnessMetric`, using a separate LLM (`llama-3.3-70b-versatile`) as judge to check whether each claim in a generated answer is supported by, contradicted by, or unverifiable from the retrieved context |
+| LLM-judged faithfulness | `evaluate_rag.py` | DeepEval's `FaithfulnessMetric`, using a separate LLM (`openai/gpt-oss-120b`) as judge to check whether each claim in a generated answer is supported by, contradicted by, or unverifiable from the retrieved context |
 
 The LLM judged faithfulness is the most rigorous test here. It decomposes the response into individual claims, checking each one against the source material. This is also why a stronger model is used as a judge here compared to the faster model for production answering.
 
@@ -206,18 +206,20 @@ Parent-child chunking comes across better on both faithfulness measures and has 
  
 ### LLM-judged faithfulness
  
-Evaluated 6 logged queries with `FaithfulnessMetric` (DeepEval), judged by `llama-3.3-70b-versatile`:
+Evaluated 6 logged queries with `FaithfulnessMetric` (DeepEval), judged by `openai/gpt-oss-120b`:
  
 ```
 Pass rate: 100% (6/6 passed threshold 0.7)
 Perfect scores (1.0): 6/6
-Mean claims per case: 7.2
-Verdicts across all cases: 42% yes, 58% idk, 0% no
+Mean claims per case: 6.3
+Verdicts across all cases: 87% yes, 13% idk, 0% no
 ```
  
 **Key Findings**
-* Zero claims were flagged as contradicting the retrieved context - across every logged query, the system never asserted something the source material disputed. 
-* Only 42% of individual claims were assigned a clean "yes" (directly traceable to specific retrieved text); the remaining 58% were "idk" - not contradicted, but not strictly confirmable either, possibly because the model synthesized or lightly elaborated on what was retrieved rather than quoting it directly.
+* Zero claims were flagged as contradicting the retrieved context - across every logged query, the system never asserted something the source material disputed.
+* 87% of individual claims were assigned a clean "yes" (directly traceable to specific retrieved text) - the remaining 13% were "idk," not contradicted, but not strictly confirmable either.
+* These numbers were re-run after migrating off a deprecated judge model (`llama-3.3-70b-versatile`, retired by Groq). The yes-rate moved substantially (42% to 87%) between judges, highlighting how much a judge's own calibration - not just the system's actual behavior - drives these scores.
+
 
 ### Hallucination Comparison: RAG vs LLM
 
