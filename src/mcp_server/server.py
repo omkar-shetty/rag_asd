@@ -3,12 +3,12 @@
 
 from functools import cache
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.fastmcp import FastMCP  
 
 from src.agent.web_search import tavily_client
 from src.constants import Constants
 
-mcp = MCPServer("rag-asd")
+mcp = FastMCP("rag-asd")  
 
 
 @cache
