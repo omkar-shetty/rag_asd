@@ -5,13 +5,17 @@ from src.agent.retriever import build_retriever
 from src.agent.llm import llm
 from src.constants import Constants
 from src.agent.web_search import tavily_client
+from src.agent import mcp_client
 
-retriever = build_retriever()
+retriever = None if Constants.USE_MCP else build_retriever()
 
 def corpus_search_node(state: AgentState) -> dict:
     """Search the corpus for relevant documents and update the state."""
 
-    docs = retriever.invoke(state["question"])
+    if Constants.USE_MCP:
+        docs = mcp_client.corpus_search(state["question"])
+    else:
+        docs = retriever.invoke(state["question"])
 
     return {"retrieved_docs": docs}
 
@@ -86,10 +90,14 @@ def refuse_node(state: AgentState) -> dict:
 def web_search_node(state: AgentState) -> dict:
     """Generate a reply based on a web search."""
 
-    results = tavily_client.search(query = state["question"], 
-                                   include_domains=Constants.CURATED_DOMAINS,
-                                   max_results=5)
-    context = " ".join(r["content"] for r in results.get("results", []))
+    if Constants.USE_MCP:
+        results = mcp_client.web_search(state["question"])
+    else:
+        response = tavily_client.search(query=state["question"], 
+                                        include_domains=Constants.CURATED_DOMAINS, 
+                                        max_results=5)
+        results = response.get("results", [])
+    context = " ".join(r["content"] for r in results)
     context = context if context else "No results found."
 
     prompt = ChatPromptTemplate.from_template(
@@ -100,8 +108,8 @@ def web_search_node(state: AgentState) -> dict:
     rendered = prompt.format(context=context, question=state["question"])
     response = llm.invoke(rendered)
 
-    urls = [r["url"] for r in results.get("results", [])]
-
+    urls = [r["url"] for r in results]
+    
     return {
         "answer": response.content,
         "source": "web",

@@ -1,6 +1,7 @@
 """MCP server exposing rag_asd's retrieval and web search 
 """
 import asyncio
+import os
 from functools import cache
 
 from mcp.server.fastmcp import FastMCP  
@@ -42,4 +43,4 @@ async def web_search(query: str) -> list[dict]:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(transport=os.getenv("MCP_TRANSPORT", "stdio"))
