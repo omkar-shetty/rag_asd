@@ -8,6 +8,9 @@ class Constants:
     DYNAMODB_ENDPOINT = os.getenv("DYNAMODB_ENDPOINT") 
     AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
     GAPS_TABLE = os.getenv("GAPS_TABLE", "corpus_gaps")
+    MAX_QUESTION_LEN = 1000
+    MAX_URLS_PER_GAP = 5
+    MAX_URL_LEN = 200
 
     CURATED_DOMAINS = [
     "cdc.gov",              

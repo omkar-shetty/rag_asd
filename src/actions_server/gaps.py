@@ -3,6 +3,7 @@
 import os
 import hashlib
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 from functools import cache
 
 import boto3
@@ -22,13 +23,13 @@ def get_dynamodb_resource():
 
 @cache
 def get_table():
-    return get_dynamodb_resource().Table(TABLE)
+    return get_dynamodb_resource().Table(Constants.GAPS_TABLE)
 
 def normalize(question):
     return " ".join(question.split()).lower()
 
-
 def log_gap(table, question, urls):
+    validate(question, urls)
     key = hashlib.sha256(normalize(question).encode()).hexdigest()
     now = datetime.now(timezone.utc).isoformat()
     response = table.update_item(
@@ -51,3 +52,20 @@ def log_gap(table, question, urls):
         ReturnValues="UPDATED_NEW",
     )
     return {"question_hash": key, "count": int(response["Attributes"]["count"])}
+
+def validate(question, urls):
+    if not isinstance(question, str):
+        raise ValueError("Question must be a string.")
+    if len(question) > Constants.MAX_QUESTION_LEN:
+        raise ValueError(f"Question exceeds maximum length of {Constants.MAX_QUESTION_LEN} characters.")
+    question_normalized = normalize(question)
+    if not question_normalized:
+        raise ValueError("Question cannot be empty or whitespace.")
+    if not isinstance(urls, list) or len(urls) > Constants.MAX_URLS_PER_GAP:
+        raise ValueError(f"URLs must be a list of strings less than {Constants.MAX_URLS_PER_GAP}.")
+    for url in urls:
+        if not isinstance(url, str) or len(url) > Constants.MAX_URL_LEN:
+            raise ValueError(f"Each URL must be a string less than {Constants.MAX_URL_LEN} characters.")
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError(f"Not a valid http(s) URL: {url}")
