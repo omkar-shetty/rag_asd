@@ -25,12 +25,15 @@ def get_dynamodb_resource():
 def get_table():
     return get_dynamodb_resource().Table(Constants.GAPS_TABLE)
 
+def question_key(question):
+    return hashlib.sha256(normalize(question).encode()).hexdigest()
+
 def normalize(question):
     return " ".join(question.split()).lower()
 
 def log_gap(table, question, urls):
     validate(question, urls)
-    key = hashlib.sha256(normalize(question).encode()).hexdigest()
+    key = question_key(question)
     now = datetime.now(timezone.utc).isoformat()
     response = table.update_item(
         Key={"question_hash": key},

@@ -1,5 +1,5 @@
-"""MCP server exposing rag_asd's retrieval and web search 
-"""
+"""MCP server exposing rag_asd's retrieval and web search as tools."""
+
 import asyncio
 import os
 from functools import cache
@@ -22,14 +22,20 @@ def get_retriever():
 
 @mcp.tool()
 async def corpus_search(query: str) -> list[dict]:
-    """...keep your existing docstring..."""
+    """Search the curated ASD (Autism Spectrum Disorder) clinical and
+    caregiver document corpus. Use for questions about symptoms, diagnosis,
+    therapies, caregiver strategies, or research findings. Returns relevant
+    passages with their source files, or an empty list if nothing matches."""
     docs = await asyncio.to_thread(lambda: get_retriever().invoke(query))
     return [{"content": d.page_content, "source": d.metadata.get("source")} for d in docs]
 
 
 @mcp.tool()
 async def web_search(query: str) -> list[dict]:
-    """...keep your existing docstring..."""
+    """Search a fixed allowlist of trusted ASD sources (CDC, NIH, WHO and
+    similar) for recent information the corpus may lack. Try corpus_search
+    first for established knowledge. Returns title, URL and content for
+    each result."""
     response = await asyncio.to_thread(
         tavily_client.search,
         query=query,
