@@ -13,6 +13,8 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from src.actions_server.gaps import get_table, question_key
 from src.constants import Constants
+from src.agent import mcp_client
+from src.agent.mcp_client import ToolCallError
 
 URL = "http://127.0.0.1:8002/mcp"
 
@@ -63,3 +65,12 @@ def test_invalid_input_is_rejected_and_nothing_is_written(question):
     assert result.isError
     assert "valid http" in result.content[0].text
     assert "Item" not in get_table().get_item(Key={"question_hash": question_key(question)})
+
+
+def test_client_helper_happy_path(question):
+    assert mcp_client.log_corpus_gap(question, [])["count"] == 1
+
+
+def test_client_helper_turns_server_errors_into_tool_call_error(question):
+    with pytest.raises(ToolCallError, match="valid http"):
+        mcp_client.log_corpus_gap(question, ["javascript:alert(1)"])
