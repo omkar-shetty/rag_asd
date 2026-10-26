@@ -16,8 +16,12 @@ class AgentState(TypedDict):
     # set by quality_gate, read by the conditional edge to pick the next node
     routing_decision: Literal["out_of_scope", "sufficient", "needs_web", "needs_direct"] | None
  
-    web_results: str | None # only populated if web_search_node actually runs
+    web_results: list[str] | None # only populated if web_search_node actually runs
  
     answer: str | None # final user-facing text
  
     source: Literal["corpus", "web", "direct", "refused"] | None # which path actually produced the answer
+
+    proposed_gap: dict | None # details of the proposed gap, includes the question and the urls
+
+    gap_status: Literal["proposed", "declined", "logged", "failed"] | None

@@ -6,6 +6,9 @@ from src.agent.llm import llm
 from src.constants import Constants
 from src.agent.web_search import tavily_client
 from src.agent import mcp_client
+from src.logger_config import setup_script_logger
+
+logger = setup_script_logger("agent")
 
 retriever = None if Constants.USE_MCP else build_retriever()
 
@@ -115,3 +118,29 @@ def web_search_node(state: AgentState) -> dict:
         "source": "web",
         "web_results": urls
     }
+
+def propose_gap_node(state: AgentState) -> dict:
+    """Generate payload to log a corpus gap."""
+
+    urls = [] #to be filled in by web_search later
+    
+    return {
+        "proposed_gap": {
+            "question": state["question"],
+            "urls": urls
+        },
+        "gap_status": "proposed"
+    }
+
+def log_gap_node(state: AgentState) -> dict:
+    """Send the gap to the actions server."""
+
+    gap_payload = state["proposed_gap"]
+
+    try:
+        mcp_client.log_corpus_gap(gap_payload["question"], gap_payload["urls"])
+    except mcp_client.ToolCallError as e:
+        logger.warning("Could not log corpus gap: %s", e)
+        return {"gap_status": "failed"}
+
+    return {"gap_status": "logged"}

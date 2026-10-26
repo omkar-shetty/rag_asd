@@ -9,6 +9,9 @@ class Constants:
     DYNAMODB_ENDPOINT = os.getenv("DYNAMODB_ENDPOINT") 
     AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
     GAPS_TABLE = os.getenv("GAPS_TABLE", "corpus_gaps")
+    GAP_APPROVAL = os.getenv("GAP_APPROVAL", "required") #set whether a manual approval is needed for a db write
+    if GAP_APPROVAL not in ("required", "auto"):
+        raise ValueError(f"GAP_APPROVAL must be 'required' or 'auto', got {GAP_APPROVAL!r}")
     MAX_QUESTION_LEN = 1000
     MAX_URLS_PER_GAP = 5
     MAX_URL_LEN = 200
