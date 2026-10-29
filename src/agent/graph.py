@@ -1,5 +1,3 @@
-from asyncio import graph
-
 from langgraph.graph import StateGraph, END
 from src.agent.state import AgentState
 from src.agent.nodes import (
@@ -12,18 +10,11 @@ from src.agent.nodes import (
     propose_gap_node,
     log_gap_node,
 )
-from src.constants import Constants
+from src.agent.routing import (
+    route_after_quality_gate,
+    route_after_direct_answer,
+    route_after_propose_gap)
 
-def route_after_quality_gate(state: AgentState) -> str:
-    return state["routing_decision"]
-
-def route_after_direct_answer(state: AgentState) -> str:
-    """Propose a gap only when the actions server is in use."""
-    return "propose_gap" if Constants.USE_MCP else END
-
-def route_after_propose_gap(state: AgentState) -> str:
-    """Log immediately in auto mode; otherwise stop (until the approval step exists)."""
-    return "log_gap" if Constants.GAP_APPROVAL == "auto" else END
 
 def build_graph():
     graph = StateGraph(AgentState)
@@ -60,7 +51,6 @@ def build_graph():
     {"log_gap": "log_gap", END: END},
     )
     graph.add_edge("log_gap", END)
-    graph.add_edge("propose_gap", log_gap_node)
     graph.add_edge("refuse", END)
 
     return graph.compile()
